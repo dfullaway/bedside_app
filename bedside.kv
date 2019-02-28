@@ -1,0 +1,527 @@
+#:kivy 1.9.1
+#: import scma kivy.uix.screenmanager
+
+ScreenManager:
+    id: sm
+
+    ClockWidget:
+        id: home
+        on_enter:self.start_clock()
+        on_leave: self.stop_clock()
+        name: "Home"
+        manager: sm
+    ProgramDialog:
+        id: programs
+        name: "Programs"
+        manager: sm
+    WeatherPage:
+        id: weatherpage
+        on_enter: self.fill_page()
+        name: "Weather Page"
+        manager: sm
+    AlarmSchedule:
+        id: alarmdialog
+        name: "Alarm Schedule"
+        manager: sm
+    AlarmCancel:
+        id: canceldialog
+        name: "Alarm Cancel"
+        manager: sm
+    Alarm:
+        id:alarmpop
+        on_enter: self.trigger()
+        name: 'Alarm'
+        manager: sm
+    Lights:
+        id: lights
+        name: 'Lights'
+        manager: sm
+    PandoraRadio:
+        id: radio
+        on_enter: radio.ids.musicpicture.reload()
+        name: 'Pandora Radio'
+        manager: sm
+    ScreenOff:
+        id: screenoff
+        name: 'Screen Off'
+        # on_enter: app.backlight_swap()
+        # on_leave: app.backlight_swap()
+
+
+<ThemeButton@Button>:
+    color: [256/256, 256/256, 256/256, 1]
+    background_normal: ""
+    background_color: [0/256, 150/256, 150/256, 1]
+
+<ClockWidget>:
+    FloatLayout:
+        AnchorLayout:
+            anchor_x: 'left'
+            anchor_y: 'top'
+
+            Button:
+                id: program
+                font_size: 12
+                background_color: [0, 0, 0, 1]
+                size_hint_x: .25
+                size_hint_y: .25
+                text: "Program"
+                on_press:
+                    root.manager.transition = scma.RiseInTransition()
+                    root.manager.current = 'Programs'
+
+        AnchorLayout:
+            anchor_x: 'right'
+            anchor_y: 'top'
+            Button:
+                id: alarm
+                size_hint: (.25, .25)
+                font_size: 12
+                background_color: [0, 0, 0, 1]
+                text: "Next Alarm"
+                on_press:
+                    root.manager.transition = scma.RiseInTransition()
+                    root.manager.current = 'Alarm Schedule'
+
+        AnchorLayout:
+
+            anchor_x: 'center'
+            anchor_y: 'center'
+
+            BoxLayout:
+                size_hint: (.5, .5)
+                orientation: 'vertical'
+                Label:
+                    id: date
+                    text: ""
+                Button:
+                    id: time
+                    background_color: [0, 0, 0, 1]
+                    font_size: 60
+                    text: "Time"
+                    on_press:
+                        app.backlight_swap()
+                        # root.manager.current = 'Screen Off'
+
+        AnchorLayout:
+            anchor_x: 'left'
+            anchor_y: 'bottom'
+            Button:
+                id: weather
+                font_size: 12
+                size_hint: (.25, .25)
+                background_color: [0, 0, 0, 1]
+                text: "Not Loaded"
+                on_press:
+                    root.manager.transition = scma.RiseInTransition()
+                    root.manager.current = 'Weather Page'
+
+        AnchorLayout:
+            anchor_x: 'right'
+            anchor_y: 'bottom'
+            Label:
+                id: roomtemp
+                font_size: 12
+                size_hint: (.25, .25)
+                text: "Room Temp"
+
+        AnchorLayout:
+            anchor_x: 'right'
+            anchor_y: 'center'
+            Button:
+                size_hint: (.25, .5)
+                background_color: [0, 0, 0, 1]
+                on_press:
+                    root.manager.transition = scma.SlideTransition()
+                    root.manager.current = 'Lights'
+
+        AnchorLayout:
+            anchor_x: 'center'
+            anchor_y: 'bottom'
+            Button:
+                id: musicdisplay
+                background_color: [0, 0, 0, 1]
+                size_hint: (.5, .25)
+                font_size: 12
+                text: ''
+                on_press:
+                    root.manager.transition = scma.RiseInTransition()
+                    root.manager.current = 'Pandora Radio'
+
+        AnchorLayout:
+            anchor_x: 'left'
+            anchor_y: 'center'
+            Button:
+                text: 'Lights'
+                size_hint: (.25, .5)
+                background_color: [0, 0, 0, 1]
+                on_press: app.set_scene('darkness')
+
+
+<ProgramDialog>:
+    canvas.before:
+        Color:
+            rgba: [0/256, 0/256, 0/256, 1]
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    BoxLayout:
+        orientation: 'vertical'
+        padding: [20, 20]
+
+
+        Label:
+            text: 'Programs'
+            font_size: 30
+
+        GridLayout:
+            cols: 2
+            size_hint_y: 2
+            padding: [0, 20]
+            spacing: [10,10]
+
+            ThemeButton:
+                text: "Night Music"
+                on_press:
+                    app.start_sleep_music()
+                    root.manager.transition = scma.FallOutTransition()
+                    root.manager.current = 'Pandora Radio'
+
+            ThemeButton:
+                text: "Lights Out"
+                on_press:
+                    app.set_scene('darkness')
+                    root.manager.transition = scma.FallOutTransition()
+                    root.manager.current = 'Home'
+
+            ThemeButton:
+                text: 'End Current'
+                on_press:
+                    app.program_ender()
+                    root.manager.transition = scma.FallOutTransition()
+                    root.manager.current = 'Home'
+
+            ThemeButton:
+                text: 'Brown Chicken / Cow'
+                on_press:
+                    app.set_scene('BCBC')
+                    root.manager.transition = scma.FallOutTransition()
+                    root.manager.current = 'Home'
+
+        ThemeButton:
+            text: 'Return'
+            on_press:
+                root.manager.transition = scma.FallOutTransition()
+                root.manager.current = 'Home'
+
+<WeatherPage>:
+    BoxLayout:
+        orientation: 'vertical'
+
+        Label:
+            text: 'Current Weather'
+            id: locationlabel
+            font_size: 30
+
+        GridLayout:
+            cols: 2
+
+            Label:
+                text: 'Temperature'
+                size_hint_x: None
+                width: 50
+
+            Label:
+                id: currenttemp
+                text: ''
+
+            Label:
+                text: 'Humidity'
+                size_hint_x: None
+                width: 50
+
+            Label:
+                id: currenthumidity
+                text: ''
+
+            Label:
+                text: 'Wind'
+                size_hint_x: None
+                width: 50
+
+            Label:
+                id: currentwind
+                text: ''
+
+            Label:
+                text: 'Sky Condition'
+                size_hint_x: None
+                width: 50
+
+            Label:
+                id: currentsky
+                text: ''
+
+        Label:
+            id: forecastlabel
+            text: 'Forecast'
+
+        GridLayout:
+            cols:2
+
+            Label:
+                text: 'High'
+
+            Label:
+                id: forecasthigh
+                text:''
+
+            Label:
+                text: 'Low'
+
+            Label:
+                id:forecastlow
+                text:''
+
+            Label:
+                text: 'Sky Condition'
+
+            Label:
+                text_size: self.size
+                id: forecastsky
+                text: ''
+        Button:
+            text: 'Return'
+            background_color: [0, 0, 0, 1]
+            on_press:
+                root.manager.transition = scma.FallOutTransition()
+                root.manager.current = 'Home'
+
+<AlarmSchedule>:
+    BoxLayout:
+        orientation: 'vertical'
+        padding: [20, 20]
+        spacing: 10
+
+        Label:
+            text: "Set Alarm"
+            font_size: 40
+
+        BoxLayout:
+            orientation: 'horizontal'
+            spacing: 10
+
+            Spinner:
+                background_color: [0/256, 150/256, 150/256, 1]
+                id: alarmhour
+                text: '06'
+                values: ('01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12')
+
+            Spinner:
+                background_color: [0/256, 150/256, 150/256, 1]
+                id: alarmminute
+                text: "00"
+                values: ('00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55')
+
+            Spinner:
+                background_color: [0/256, 150/256, 150/256, 1]
+                id: alarmAMPM
+                text: "AM"
+                values: ('AM', 'PM')
+
+        ThemeButton:
+            text: "Set Alarm"
+            on_press:
+                root.time_handler()
+                root.manager.transition = scma.FallOutTransition()
+                root.manager.current = 'Home'
+
+        ThemeButton:
+            text: "Nap"
+            on_press:
+                root.nap()
+                root.manager.transition = scma.FallOutTransition()
+                root.manager.current = 'Home'
+
+        ThemeButton:
+            text: 'Remove Alarm'
+            on_press:
+                root.manager.transition = scma.RiseInTransition()
+                root.manager.current = "Alarm Cancel"
+
+        ThemeButton:
+            text: 'Return'
+            on_press:
+                root.manager.transition = scma.FallOutTransition()
+                root.manager.current = 'Home'
+
+<AlarmCancel>:
+    BoxLayout:
+        orientation: 'vertical'
+
+        Label:
+            text: 'Cancel Menu'
+
+        Spinner:
+            id: cancel_choice
+            background_color: [0/256, 150/256, 150/256, 1]
+            text: 'Choose an Alarm'
+            values: (date[0].strftime('%d %b %H%M') for date in app.alarm_schedule)
+
+        ThemeButton:
+            text: 'Remove Alarm'
+            on_press:
+                root.canceler(cancel_choice.text)
+                cancel_choice.text = 'Choose an Alarm'
+                root.manager.transition = scma.FallOutTransition()
+                root.manager.current = 'Home'
+
+        ThemeButton:
+            text: 'Return'
+            on_press:
+                root.manager.transition = scma.FallOutTransition()
+                root.manager.current = 'Home'
+
+<Alarm>:
+    BoxLayout
+        orientation: 'vertical'
+
+        Label:
+            text: 'Alarm!'
+
+        Label:
+            id: wakeupweather
+            text: ''
+
+        Button:
+            text: 'Dismiss'
+            on_press:
+                root.cancel_alarm()
+                root.manager.transition = scma.FallOutTransition()
+                root.manager.current = 'Home'
+
+<Lights>:
+    BoxLayout
+        orientation: 'horizontal'
+
+        BoxLayout
+            orientation: 'vertical'
+
+            Button:
+                text: 'Lights Off'
+                background_color: [1,1,1,0]
+                on_press:
+                    root.ids.cp.color = [1,1,1,0]
+                    root.set_color()
+
+            Button:
+                text: 'Lights On'
+                background_color: [1,1,1,0]
+                on_press:
+                    root.ids.cp.color = [1,1,1,1]
+                    root.set_color()
+
+            Button:
+                text: 'Return'
+                background_color: [1,1,1,0]
+                on_press:
+                    root.manager.transition = scma.SlideTransition()
+                    root.manager.transition.direction = 'right'
+                    root.manager.current = 'Home'
+
+
+        ColorPicker
+            id: cp
+            on_color: root.set_color()
+
+<PandoraRadio>
+    BoxLayout:
+        orientation: 'vertical'
+
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: .1
+
+            Button:
+                size_hint_x: .25
+                background_color: [1, 1, 1, 0]
+                text: 'Return'
+                on_press:
+                    root.manager.transition = scma.FallOutTransition()
+                    root.manager.current = 'Home'
+
+            Label:
+                size_hint_x: .5
+                id: stationlabel
+                font_size: 14
+                text: ''
+                background_color: [1, 1, 1, 0]
+
+            Button:
+                size_hint_x: .25
+                background_color: [1, 1, 1, 0]
+                text: 'End'
+                on_press:
+                    app.program_ender()
+                    root.manager.transition = scma.FallOutTransition()
+                    root.manager.current = 'Home'
+
+        AsyncImage:
+            id: musicpicture
+            size_hint_y: .8
+            source: 'pandora-internet-radio.jpg'
+
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: .1
+
+            Button:
+                background_color: [1, 1, 1, 0]
+                on_press: root.send_command('+')
+                size_hint_x: .125
+                Image:
+                    source: 'ic_thumb_up_white_48dp_1x.png'
+                    id: thumbsup
+                    y: self.parent.y - 20
+                    x: self.parent.x
+
+            Button:
+                background_color: [1, 1, 1, 0]
+                on_press: root.pause_play()
+                size_hint_x: .125
+                Image:
+                    source: 'ic_pause_white_48dp_1x.png'
+                    id: pauseimage
+                    y: self.parent.y - 20
+                    x: self.parent.x
+
+            Label:
+                id: songdetail
+                background_color: [1, 1, 1, 0]
+                size_hint_x: 0.5
+                text: ''
+
+            Button:
+                background_color: [1, 1, 1, 0]
+                on_press: root.send_command('n')
+                size_hint_x: .125
+                Image:
+                    source: 'ic_skip_next_white_48dp_1x.png'
+                    y: self.parent.y - 20
+                    x: self.parent.x
+
+
+            Button:
+                background_color: [1, 1, 1, 0]
+                on_press: root.send_command('-')
+                size_hint_x: .125
+                Image:
+                    source: 'ic_remove_circle_white_48dp_1x.png'
+                    y: self.parent.y - 20
+                    x: self.parent.x
+
+<ScreenOff>
+    Button:
+        on_press:
+            root.manager.current = 'Home'
+            # app.backlight_swap()
