@@ -13,12 +13,12 @@ import glob
 import paho.mqtt.client as mqtt
 import signal
 import pickle
-import homeassistant.remote as remote
+import requests
 from kivy.support import install_twisted_reactor
 install_twisted_reactor()
 from twisted.internet import reactor
 from twisted.internet import protocol
-import rpi_backlight
+#import rpi_backlight
 import json
 
 
@@ -57,14 +57,38 @@ PASSWORD = sensor.get('PW')
 SERVER = sensor.get('ServerAddress')
 home = config['HomeAssistant']
 HAServer = home.get('Server')
-HAPass = home.get('Password', fallback='')
+HAToken = home.get('TOKEN', fallback='')
 
+
+HAURL = 'http://' + HAServer +':8123/api/'
+
+TOKEN = 'Bearer ' + HAToken
+
+headers = {
+    'Authorization': TOKEN,
+    'content-type': 'application/json',
+}
 
 
 # Connect to Home Assistant Server
-# api = remote.API(HAServer, HAPass)
 # HomeAssistant setup to allow access from this IP address
-api = remote.API(HAServer)
+
+
+def getState(entity):
+    response = requests.get(HAURL + 'states/'+ entity, headers=headers)
+    return response.json()["state"]
+
+def set_scene(scene):
+    string_scene = '"scene.' + str(scene) + '"'
+    post_url = HAURL + 'services/scene/turn_on'
+    data = '{"entity_id":' + string_scene + '}'
+    requests.post(post_url, headers=headers, data=data)
+
+def switch_on(switch):
+    string_switch = '"switch.' + str(switch) + '"'
+    post_url = HAURL + 'services/switch/turn_on'
+    data = '{"entity_id":' + string_switch +'}'
+    requests.post(post_url, headers=headers, data=data)
 
 # TODO Take appropriate steps if connection to MQTT server is unavailable
 # Setup MQTT Client and connect
@@ -239,14 +263,14 @@ class WeatherPage(Screen):
         :return:
         '''
         # global top
-        current_temp = remote.get_state(api, "sensor.dark_sky_temperature")
-        current_humidity = remote.get_state(api, "sensor.dark_sky_humidity")
-        current_wind_direction = remote.get_state(api, "sensor.dark_sky_wind_bearing")
-        current_wind_velocity = remote.get_state(api, "sensor.dark_sky_wind_speed")
-        current_summary = remote.get_state(api, "sensor.dark_sky_hourly_summary")
-        tomorrow_high = remote.get_state(api, "sensor.dark_sky_daytime_high_temperature_1")
-        tomorrow_low = remote.get_state(api, "sensor.dark_sky_overnight_low_temperature_1")
-        tomorrow_condition = remote.get_state(api, "sensor.dark_sky_daily_summary")
+        current_temp = getState("sensor.dark_sky_temperature")
+        current_humidity = getState("sensor.dark_sky_humidity")
+        current_wind_direction = getState("sensor.dark_sky_wind_bearing")
+        current_wind_velocity = getState("sensor.dark_sky_wind_speed")
+        current_summary = getState("sensor.dark_sky_hourly_summary")
+        tomorrow_high = getState("sensor.dark_sky_daytime_high_temperature_1")
+        tomorrow_low = getState("sensor.dark_sky_overnight_low_temperature_1")
+        tomorrow_condition = getState("sensor.dark_sky_daily_summary")
 
         try:
             self.ids.currenttemp.text = current_temp.state + '\u00B0 F'
@@ -340,20 +364,20 @@ class Alarm(Screen):
         :return:
         '''
 
-        current_summary = remote.get_state(api, "sensor.dark_sky_hourly_summary")
-        today_high = remote.get_state(api, "sensor.dark_sky_daytime_high_temperature_1")
-        today_low = remote.get_state(api, "sensor.dark_sky_overnight_low_temperature_1")
+        current_summary = getState("sensor.dark_sky_hourly_summary")
+        today_high = getState("sensor.dark_sky_daytime_high_temperature_1")
+        today_low = getState("sensor.dark_sky_overnight_low_temperature_1")
 
         string = "Today's Weather: High of {0}, Low of {1} \n {2}".format(today_high.state, today_low.state,
                                                                           current_summary.state)
 
         self.ids.wakeupweather.text = string
         self.song = self.choose_song()
-        rpi_backlight.set_brightness(255)
+        #rpi_backlight.set_brightness(255)
 
         # Start Song with fade in and Stepup method to increase volume and brightness
         self.snd = Popen(["play", self.song, 'fade', '45', 'vol', '45'])
-        remote.call_service(api, 'switch', 'turn_on', {'entity_id': 'switch.coffee_maker'})
+        switch_on('coffee_maker')
         kivy.clock.Clock.schedule_interval(self.stepup, 1.5)
 
 
@@ -539,8 +563,8 @@ class BedsideApp(App):
 
         """
         if PI:
-            outside_temp = remote.get_state(api, 'sensor.dark_sky_temperature')
-            weather_condition = remote.get_state(api, 'sensor.dark_sky_summary')
+            outside_temp = getState('sensor.dark_sky_temperature')
+            weather_condition = getState('sensor.dark_sky_summary')
             self.root.ids.home.ids.weather.color = [1, 1, 1, 1]
             try:
                 self.root.ids.home.ids.weather.text = (weather_condition.state + '\n' + outside_temp.state + '\u00B0 F')
@@ -651,9 +675,6 @@ class BedsideApp(App):
             self.root.ids.home.ids.musicdisplay.text = " "
             self.root.ids.radio.ids.thumbsup.color = [1, 1, 1, 1]
 
-    def set_scene(self, scene):
-        string_scene = "scene." + str(scene)
-        remote.call_service(api, 'scene', 'turn_on', {'entity_id': string_scene})
 
 
 if __name__ == '__main__':
