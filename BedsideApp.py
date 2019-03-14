@@ -1,3 +1,5 @@
+from os import system, environ
+environ['KIVY_GL_BACKEND'] = 'gl'
 from kivy.app import App
 from kivy.uix.screenmanager import Screen
 from kivy.properties import ListProperty
@@ -5,7 +7,7 @@ import kivy.clock
 from time import strftime, mktime, time, strptime
 from platform import machine
 import configparser
-from os import system
+# from os import system
 from subprocess import Popen
 import datetime
 import random
@@ -13,12 +15,13 @@ import glob
 import paho.mqtt.client as mqtt
 import signal
 import pickle
-import requests
+# import requests
+from ha_helpers import getState, set_scene, switch_on, ha_setup
 from kivy.support import install_twisted_reactor
 install_twisted_reactor()
 from twisted.internet import reactor
 from twisted.internet import protocol
-#import rpi_backlight
+# import rpi_backlight
 import json
 
 
@@ -30,7 +33,8 @@ __author__ = 'Dan Fullaway'
 if machine() == 'armv7l':
     PI = True
     CHANNEL = 'Master'
-    fifopath = '/home/pi/pianoctl'
+    fifopath = '/home/pi/.local/share/applications/pianoctl'
+    # fifopath = '/home/pi/pianoctl'
 else:
     PI = False
     CHANNEL = 'Master'
@@ -39,7 +43,8 @@ else:
 
 # Import Settings from a configuration file in the same folder as the executable
 config = configparser.ConfigParser()
-config.read('config.txt')
+config.read("./config.txt")
+#config.read('/home/pi/.config/bedsideapp/config.txt')
 lights = config['Lights']
 RED_PIN = lights.getint('Red', fallback='4')
 GREEN_PIN = lights.getint('Green', fallback='22')
@@ -64,31 +69,27 @@ HAURL = 'http://' + HAServer +':8123/api/'
 
 TOKEN = 'Bearer ' + HAToken
 
-headers = {
-    'Authorization': TOKEN,
-    'content-type': 'application/json',
-}
+ha_setup(HAURL, TOKEN)
 
 
 # Connect to Home Assistant Server
 # HomeAssistant setup to allow access from this IP address
 
-
-def getState(entity):
-    response = requests.get(HAURL + 'states/'+ entity, headers=headers)
-    return response.json()["state"]
-
-def set_scene(scene):
-    string_scene = '"scene.' + str(scene) + '"'
-    post_url = HAURL + 'services/scene/turn_on'
-    data = '{"entity_id":' + string_scene + '}'
-    requests.post(post_url, headers=headers, data=data)
-
-def switch_on(switch):
-    string_switch = '"switch.' + str(switch) + '"'
-    post_url = HAURL + 'services/switch/turn_on'
-    data = '{"entity_id":' + string_switch +'}'
-    requests.post(post_url, headers=headers, data=data)
+# def getState(entity):
+#     response = requests.get(HAURL + 'states/'+ entity, headers=headers)
+#     return response.json()["state"]
+#
+# def set_scene(scene):
+#     string_scene = '"scene.' + str(scene) + '"'
+#     post_url = HAURL + 'services/scene/turn_on'
+#     data = '{"entity_id":' + string_scene + '}'
+#     requests.post(post_url, headers=headers, data=data)
+#
+# def switch_on(switch):
+#     string_switch = '"switch.' + str(switch) + '"'
+#     post_url = HAURL + 'services/switch/turn_on'
+#     data = '{"entity_id":' + string_switch +'}'
+#     requests.post(post_url, headers=headers, data=data)
 
 # TODO Take appropriate steps if connection to MQTT server is unavailable
 # Setup MQTT Client and connect
@@ -240,11 +241,17 @@ class ClockWidget(Screen):
         # print('Stopped')
         kivy.clock.Clock.unschedule(self.clockupdater)
 
+    def set_scene(self, scene):
+            set_scene(scene)
+
 
 class ProgramDialog(Screen):
 
     def __init__(self, **kw):
         Screen.__init__(self, **kw)
+
+    def set_scene(self, scene):
+            set_scene(scene)
 
 
 class WeatherPage(Screen):
@@ -273,14 +280,14 @@ class WeatherPage(Screen):
         tomorrow_condition = getState("sensor.dark_sky_daily_summary")
 
         try:
-            self.ids.currenttemp.text = current_temp.state + '\u00B0 F'
-            self.ids.currenthumidity.text = current_humidity.state + '%'
-            self.ids.currentwind.text = '{0} at {1} mph'.format(current_wind_direction.state,
-                                                                current_wind_velocity.state)
-            self.ids.currentsky.text = current_summary.state
-            self.ids.forecasthigh.text = '{0}\u00B0 F'.format(tomorrow_high.state)
-            self.ids.forecastlow.text = '{0}\u00B0 F'.format(tomorrow_low.state)
-            self.ids.forecastsky.text = tomorrow_condition.state
+            self.ids.currenttemp.text = current_temp + '\u00B0 F'
+            self.ids.currenthumidity.text = current_humidity + '%'
+            self.ids.currentwind.text = '{0} at {1} mph'.format(current_wind_direction,
+                                                                current_wind_velocity)
+            self.ids.currentsky.text = current_summary
+            self.ids.forecasthigh.text = '{0}\u00B0 F'.format(tomorrow_high)
+            self.ids.forecastlow.text = '{0}\u00B0 F'.format(tomorrow_low)
+            self.ids.forecastsky.text = tomorrow_condition
         except AttributeError:
             pass
 
@@ -331,7 +338,6 @@ class AlarmSchedule(Screen):
         :return:
         '''
         use_hour = int(strftime("%H"))
-        # TODO use timedelta to add 20 minutes
         use_time = datetime.datetime.now() + datetime.timedelta(minutes=20)
         #use_time = datetime.time(hour=use_hour, minute=int(strftime("%M"))+20)
         #dtg = datetime.datetime.combine(datetime.date.today(), use_time)
@@ -368,8 +374,8 @@ class Alarm(Screen):
         today_high = getState("sensor.dark_sky_daytime_high_temperature_1")
         today_low = getState("sensor.dark_sky_overnight_low_temperature_1")
 
-        string = "Today's Weather: High of {0}, Low of {1} \n {2}".format(today_high.state, today_low.state,
-                                                                          current_summary.state)
+        string = "Today's Weather: High of {0}, Low of {1} \n {2}".format(today_high, today_low,
+                                                                          current_summary)
 
         self.ids.wakeupweather.text = string
         self.song = self.choose_song()
@@ -487,7 +493,8 @@ class BedsideApp(App):
         self.temp_update()
         set_lights(current_light, False)
         try:
-            with open('alarmschedule', 'rb') as f:
+            #with open('/home/pi/.local/bin/alarmschedule', 'rb') as f:
+            with open('./alarmschedule', 'rb') as f:
                 sched = pickle.load(f)
             for alarm in sched:
                 self.schedule_alarm(alarm)
@@ -522,7 +529,7 @@ class BedsideApp(App):
 
     def stepdown(self, dt):
         Popen(["amixer", 'sset', CHANNEL, str(self.counter) + '%'])
-        Popen(["pactl", ])
+        # Popen(["pactl", ])
         self.counter -= 1
         set_lights([self.redmax, self.greenmax, 0, (float(self.counter - 40) * .01) ** 2], True)
         if self.counter == (MAX_VOLUME - 40):
@@ -567,7 +574,7 @@ class BedsideApp(App):
             weather_condition = getState('sensor.dark_sky_summary')
             self.root.ids.home.ids.weather.color = [1, 1, 1, 1]
             try:
-                self.root.ids.home.ids.weather.text = (weather_condition.state + '\n' + outside_temp.state + '\u00B0 F')
+                self.root.ids.home.ids.weather.text = (weather_condition + '\n' + outside_temp + '\u00B0 F')
             except AttributeError:
                 self.root.ids.home.ids.weather.color = [1, 0, 0, 1]
                 self.root.ids.home.ids.weather.text = "Unknown"
@@ -625,7 +632,8 @@ class BedsideApp(App):
         '''
 
     def temp_update(self):
-        with open('tempfile', 'r') as f:
+        #with open('/home/pi/.local/share/tempfile', 'r') as f:
+        with open('./tempfile', 'r') as f:
             data = f.read()
         temp, hum = data.split('\n')
         temp = temp.replace('Temp:','').replace('deg F','')
