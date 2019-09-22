@@ -1,4 +1,6 @@
 from os import system, environ
+
+TOPIC_STRING = topic_string
 environ['KIVY_GL_BACKEND'] = 'gl'
 from kivy.app import App
 from kivy.uix.screenmanager import Screen
@@ -7,7 +9,6 @@ import kivy.clock
 from time import strftime, mktime, time, strptime
 from platform import machine
 import configparser
-# from os import system
 from subprocess import Popen
 import datetime
 import random
@@ -15,7 +16,6 @@ import glob
 import paho.mqtt.client as mqtt
 import signal
 import pickle
-# import requests
 from ha_helpers import getState, set_scene, switch_on, ha_setup
 from kivy.support import install_twisted_reactor
 install_twisted_reactor()
@@ -33,79 +33,40 @@ __author__ = 'Dan Fullaway'
 if machine() == 'armv7l':
     PI = True
     CHANNEL = 'Master'
-    fifopath = '/home/pi/.local/share/applications/pianoctl'
-    # fifopath = '/home/pi/pianoctl'
 else:
     PI = False
     CHANNEL = 'Master'
-    fifopath = '/home/dan/pianoctl'
-
-
-# Import Settings from a configuration file in the same folder as the executable
-config = configparser.ConfigParser()
-#config.read("./config.txt")
-config.read('/home/pi/.config/bedsideapp/config.txt')
-lights = config['Lights']
-RED_PIN = lights.getint('Red', fallback='4')
-GREEN_PIN = lights.getint('Green', fallback='22')
-BLUE_PIN = lights.getint('Blue', fallback='24')
-location = config['Location']
-CURRENT_ZIP = location.get('Zip', fallback='92057')
-sounds = config['Sounds']
-MUSIC_DIR = sounds.get('MusicDir', fallback='/home/dan/Music/')
-MAX_VOLUME = int(sounds.get('MaxVolume', fallback='90'))
-sensor = config['Sensor']
-LOCATION = sensor.get('SensorLocation')
-CERT_PATH = sensor.get('CertPath')
-CLIENT_NAME = sensor.get('ClientName')
-PASSWORD = sensor.get('PW')
-SERVER = sensor.get('ServerAddress')
-home = config['HomeAssistant']
-HAServer = home.get('Server')
-HAToken = home.get('TOKEN', fallback='')
-
-
-HAURL = 'http://' + HAServer +':8123/api/'
-
-TOKEN = 'Bearer ' + HAToken
-
-ha_setup(HAURL, TOKEN)
-
-
-
-# TODO Take appropriate steps if connection to MQTT server is unavailable
-# Setup MQTT Client and connect
-
-topic_string = 'home/' + LOCATION
-current_light = [0, 0, 0, 0]  # Current state of LEDs
-light_state = True
-music = False
-stored_alarm_schedule = []
 
 
 def mqttc_fail(signum, frame):
     print('No mqttc client connection!')
     # raise TimeoutError
 
-try:
-    signal.signal(signal.SIGALRM, mqttc_fail)
-    signal.alarm(5)
-    mqttc = mqtt.Client(client_id=CLIENT_NAME, clean_session=False)
-    mqttc.tls_set(CERT_PATH)
-    mqttc.username_pw_set(CLIENT_NAME, PASSWORD)
-    mqttc.connect(SERVER, port=8883)
+
+def setup_mqtt():
+    try:
+        signal.signal(signal.SIGALRM, mqttc_fail)
+        signal.alarm(5)
+        mqttc = mqtt.Client(client_id=CLIENT_NAME, clean_session=False)
+        mqttc.tls_set(CERT_PATH)
+        mqttc.username_pw_set(CLIENT_NAME, PASSWORD)
+        mqttc.connect(SERVER, port=8883)
 
 
-    # Subscribe to topics related to settings for light
-    mqttc.subscribe([(topic_string+'/light/switch', 2), (topic_string+'/light/brightness/set', 2),
-                     (topic_string+'/light/rgb/set', 2), ('hermes/intent/dfullaway:SetAlarm', 2),
-                     ('home/daenerys/backlight', 2)])
+        # Subscribe to topics related to settings for light
+        mqttc.subscribe([(TOPIC_STRING + '/light/switch', 2), (TOPIC_STRING + '/light/brightness/set', 2),
+                         (TOPIC_STRING + '/light/rgb/set', 2), ('hermes/intent/dfullaway:SetAlarm', 2),
+                         ('home/daenerys/backlight', 2)])
 
-    mqttc.loop_start()
-    signal.alarm(0)
-except:
-    print('MQTT Connection Failed!')
-    # Logger.warning('MQTT: connection failure')
+        mqttc.loop_start()
+        signal.alarm(0)
+    except:
+        print('MQTT Connection Failed!')
+        # Logger.warning('MQTT: connection failure')
+
+    mqttc.on_message = on_message
+    mqttc.on_disconnect = on_disconnect
+    return mqttc
 
 
 # Callbacks for MQTT
@@ -119,14 +80,14 @@ def on_message(client, userdata, message):
     '''
     # print(message.topic, message.payload)
     # Logger.debug('MQTT: Message with topic %s and payload %s', message.topic, message.payload)
-    if message.topic == topic_string+'/light/switch':
+    if message.topic == TOPIC_STRING+'/light/switch':
         if message.payload == b'OFF':
             set_lights(current_light, False)
         elif message.payload == b'ON':
             set_lights(current_light, True)
-    elif message.topic == topic_string+'/light/brightness/set':
+    elif message.topic == TOPIC_STRING+'/light/brightness/set':
         set_lights([current_light[0], current_light[1], current_light[2], float(message.payload)/255.0], True)
-    elif message.topic == topic_string+'/light/rgb/set':
+    elif message.topic == TOPIC_STRING+'/light/rgb/set':
         temp = message.payload.decode('ascii').split(',')
         set_lights([float(temp[0])/255, float(temp[1])/255, float(temp[2])/255, current_light[3]], True)
     elif message.topic == 'hermes/intent/dfullaway:SetAlarm':
@@ -145,9 +106,14 @@ def on_message(client, userdata, message):
     elif message.topic == 'home/daenerys/backlight':
         if (message.payload == 'DIM' and light_state == True):
             BedsideApp.backlight_swap(top)
+        elif (message.payload == 'BRIGHT' and light_state == False):
+            BedsideApp.backlight_swap(top)
 
 
-mqttc.on_message = on_message
+def on_disconnect(client, userdata, rc):
+    setup_mqtt()
+
+
 
 
 # Setup Protocol and Factory for Twisted Reactor / Pianobar event script
@@ -184,10 +150,10 @@ def set_lights(light_intensity, light_state):
         status = 'OFF'
     else:
         status = 'ON'
-    mqttc.publish(topic_string+'/light/status', status, 2, retain=True)
-    mqttc.publish(topic_string + '/light/brightness/status', int(light_intensity[3]*255), 2, retain=True)
+    mqttc.publish(TOPIC_STRING+'/light/status', status, 2, retain=True)
+    mqttc.publish(TOPIC_STRING + '/light/brightness/status', int(light_intensity[3]*255), 2, retain=True)
     rgb_status = ','.join(str(int(num*255)) for num in light_intensity[:3])
-    mqttc.publish(topic_string+'/light/rgb/status', rgb_status, 2, retain=True)
+    mqttc.publish(TOPIC_STRING+'/light/rgb/status', rgb_status, 2, retain=True)
 
 
 class ClockWidget(Screen):
@@ -624,8 +590,8 @@ class BedsideApp(App):
         temp, hum = data.split('\n')
         temp = temp.replace('Temp:','').replace('deg F','')
         hum = hum.replace('Humidity:','').replace('%', '')
-        topic_temp = 'home/' + LOCATION + '/temp'
-        topic_hum = 'home/' + LOCATION + '/humidity'
+        topic_temp = TOPIC_STRING + '/temp'
+        topic_hum = TOPIC_STRING + '/humidity'
         mqttc.publish(topic_temp, temp, qos=2)
         mqttc.publish(topic_hum, hum, qos=2)
         data = data.replace('deg', '\u00B0')
@@ -667,6 +633,45 @@ class BedsideApp(App):
             self.root.ids.home.ids.musicdisplay.text = " "
             self.root.ids.radio.ids.thumbsup.color = [1, 1, 1, 1]
 
+
 if __name__ == '__main__':
+    # TODO Get configuration file location from command line
+    # Import Settings from a configuration file in the same folder as the executable
+    config = configparser.ConfigParser()
+    # config.read("./config.txt")
+    config.read('/home/pi/.config/bedsideapp/config.txt')
+    lights = config['Lights']
+    RED_PIN = lights.getint('Red', fallback='4')
+    GREEN_PIN = lights.getint('Green', fallback='22')
+    BLUE_PIN = lights.getint('Blue', fallback='24')
+    location = config['Location']
+    CURRENT_ZIP = location.get('Zip', fallback='92057')
+    sounds = config['Sounds']
+    MUSIC_DIR = sounds.get('MusicDir', fallback='/home/dan/Music/')
+    MAX_VOLUME = int(sounds.get('MaxVolume', fallback='90'))
+    sensor = config['Sensor']
+    TOPIC_STRING = sensor.get('MqttPath')
+    CERT_PATH = sensor.get('CertPath')
+    CLIENT_NAME = sensor.get('ClientName')
+    PASSWORD = sensor.get('PW')
+    SERVER = sensor.get('ServerAddress')
+    home = config['HomeAssistant']
+    HAServer = home.get('Server')
+    HAToken = home.get('TOKEN', fallback='')
+    PATHS = config['LocalPaths']
+    fifopath = PATHS.get('fifo')
+
+    # Setup connection to Home Assistant
+    HAURL = 'http://' + HAServer + ':8123/api/'
+    TOKEN = 'Bearer ' + HAToken
+    ha_setup(HAURL, TOKEN)
+
+    # Setup MQTT Client and connect
+    stored_alarm_schedule = []
+    current_light = [0, 0, 0, 0]  # Current state of LEDs
+    light_state = True
+    music = False
+    mqttc = setup_mqtt()
+
     top = BedsideApp()
     top.run()
