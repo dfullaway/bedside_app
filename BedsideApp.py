@@ -21,7 +21,7 @@ from kivy.support import install_twisted_reactor
 install_twisted_reactor()
 from twisted.internet import reactor
 from twisted.internet import protocol
-# import rpi_backlight
+import rpi_backlight
 import json
 
 
@@ -43,8 +43,8 @@ else:
 
 # Import Settings from a configuration file in the same folder as the executable
 config = configparser.ConfigParser()
-config.read("./config.txt")
-#config.read('/home/pi/.config/bedsideapp/config.txt')
+#config.read("./config.txt")
+config.read('/home/pi/.config/bedsideapp/config.txt')
 lights = config['Lights']
 RED_PIN = lights.getint('Red', fallback='4')
 GREEN_PIN = lights.getint('Green', fallback='22')
@@ -72,24 +72,6 @@ TOKEN = 'Bearer ' + HAToken
 ha_setup(HAURL, TOKEN)
 
 
-# Connect to Home Assistant Server
-# HomeAssistant setup to allow access from this IP address
-
-# def getState(entity):
-#     response = requests.get(HAURL + 'states/'+ entity, headers=headers)
-#     return response.json()["state"]
-#
-# def set_scene(scene):
-#     string_scene = '"scene.' + str(scene) + '"'
-#     post_url = HAURL + 'services/scene/turn_on'
-#     data = '{"entity_id":' + string_scene + '}'
-#     requests.post(post_url, headers=headers, data=data)
-#
-# def switch_on(switch):
-#     string_switch = '"switch.' + str(switch) + '"'
-#     post_url = HAURL + 'services/switch/turn_on'
-#     data = '{"entity_id":' + string_switch +'}'
-#     requests.post(post_url, headers=headers, data=data)
 
 # TODO Take appropriate steps if connection to MQTT server is unavailable
 # Setup MQTT Client and connect
@@ -116,7 +98,8 @@ try:
 
     # Subscribe to topics related to settings for light
     mqttc.subscribe([(topic_string+'/light/switch', 2), (topic_string+'/light/brightness/set', 2),
-                     (topic_string+'/light/rgb/set', 2), ('hermes/intent/dfullaway:SetAlarm', 2)])
+                     (topic_string+'/light/rgb/set', 2), ('hermes/intent/dfullaway:SetAlarm', 2),
+                     ('home/daenerys/backlight', 2)])
 
     mqttc.loop_start()
     signal.alarm(0)
@@ -159,6 +142,9 @@ def on_message(client, userdata, message):
         response = '{"SessionId":"{ ' + session + ' }", "text":"Alarm has been set"}'
         # print(response)
         mqttc.publish('hermes/dialogueManager/endSession', payload=response)
+    elif message.topic == 'home/daenerys/backlight':
+        if (message.payload == 'DIM' and light_state == True):
+            BedsideApp.backlight_swap(top)
 
 
 mqttc.on_message = on_message
@@ -379,11 +365,11 @@ class Alarm(Screen):
 
         self.ids.wakeupweather.text = string
         self.song = self.choose_song()
-        #rpi_backlight.set_brightness(255)
+        Popen(['rpi-backlight', '-b', '255', '-s', '-d', '3'])
 
         # Start Song with fade in and Stepup method to increase volume and brightness
         self.snd = Popen(["play", self.song, 'fade', '45', 'vol', '45'])
-        switch_on('coffee_maker')
+        switch_on('coffee_machine')
         kivy.clock.Clock.schedule_interval(self.stepup, 1.5)
 
 
@@ -493,8 +479,8 @@ class BedsideApp(App):
         self.temp_update()
         set_lights(current_light, False)
         try:
-            #with open('/home/pi/.local/bin/alarmschedule', 'rb') as f:
-            with open('./alarmschedule', 'rb') as f:
+            with open('/home/pi/.local/bin/alarmschedule', 'rb') as f:
+            #with open('./alarmschedule', 'rb') as f:
                 sched = pickle.load(f)
             for alarm in sched:
                 self.schedule_alarm(alarm)
@@ -632,8 +618,8 @@ class BedsideApp(App):
         '''
 
     def temp_update(self):
-        #with open('/home/pi/.local/share/tempfile', 'r') as f:
-        with open('./tempfile', 'r') as f:
+        with open('/home/pi/.local/share/tempfile', 'r') as f:
+        #with open('./tempfile', 'r') as f:
             data = f.read()
         temp, hum = data.split('\n')
         temp = temp.replace('Temp:','').replace('deg F','')
@@ -655,10 +641,8 @@ class BedsideApp(App):
         if PI:
             if rpi_backlight.get_actual_brightness() < 50:
                 Popen(['rpi-backlight', '-b', '255', '-s', '-d', '3'])
-                # rpi_backlight.set_brightness(255, smooth=True, duration=2)
             else:
-                Popen(['rpi-backlight', '-b', '20', '-s', '-d', '3'])
-                # rpi_backlight.set_brightness(30, smooth=True, duration=2)
+                Popen(['rpi-backlight', '-b', '11', '-s', '-d', '3'])
 
     def handle_message(self, msg):
         pandora_fields = pickle.loads(msg)
@@ -682,8 +666,6 @@ class BedsideApp(App):
         elif pandora_fields['event'] == 'songstop':
             self.root.ids.home.ids.musicdisplay.text = " "
             self.root.ids.radio.ids.thumbsup.color = [1, 1, 1, 1]
-
-
 
 if __name__ == '__main__':
     top = BedsideApp()

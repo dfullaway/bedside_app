@@ -12,8 +12,15 @@ def ha_setup(url, token):
     }
 
 def getState(entity):
-    response = requests.get(HAURL + 'states/'+ entity, headers=headers)
+    try:
+        response = requests.get(HAURL + 'states/'+ entity, headers=headers)
+    except TimeoutError:
+        return "Host not available"
     return response.json()["state"]
+
+def getStateAttributes(entity):
+    response = requests.get(HAURL + 'states/' + entity, headers=headers)
+    return response.json()
 
 def set_scene(scene):
     string_scene = '"scene.' + str(scene) + '"'
