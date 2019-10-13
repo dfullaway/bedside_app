@@ -6,7 +6,7 @@ ScreenManager:
 
     ClockWidget:
         id: home
-        on_enter:self.start_clock()
+        on_enter: self.start_clock()
         on_leave: self.stop_clock()
         name: "Home"
         manager: sm
@@ -416,6 +416,7 @@ ScreenManager:
                 background_color: [1,1,1,0]
                 on_press:
                     root.ids.cp.color = [1,1,1,0]
+                    root.light_state=False
                     root.set_color()
 
             Button:
@@ -423,6 +424,7 @@ ScreenManager:
                 background_color: [1,1,1,0]
                 on_press:
                     root.ids.cp.color = [1,1,1,1]
+                    root.light_state=True
                     root.set_color()
 
             Button:
