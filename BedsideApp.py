@@ -667,7 +667,7 @@ if __name__ == '__main__':
     # Setup MQTT Client and connect
     stored_alarm_schedule = []
     current_light = [0, 0, 0, 0]  # Current state of LEDs
-    light_state = True
+    light_state = False
     music = False
     mqttc = setup_mqtt()
 
