@@ -103,9 +103,12 @@ def on_message(client, userdata, message):
         mqttc.publish('hermes/dialogueManager/endSession', payload=response)
     elif message.topic == 'home/daenerys/backlight':
         if (message.payload == 'DIM'):
+            print('Sending to bright method')
             BedsideApp.backlight_bright(top)
         elif (message.payload == 'BRIGHT'):
             BedsideApp.backlight_dim(top)
+        else:
+            print(message.payload)
 
 
 def on_disconnect(client, userdata, rc):
@@ -612,7 +615,9 @@ class BedsideApp(App):
         arguments: lightLevel
         returns nothing
         """
-        Popen(['rpi-backlight', '-b', lightLevel, '-s', '-d', '3'])
+        if PI:
+            Popen(['rpi-backlight', '-b', lightLevel, '-s', '-d', '3'])
+        print('Light level set to %s', lightLevel)
 
     def backlight_dim(self):
         Popen(['rpi-backlight', '-b', '11', '-s', '-d', '3'])
