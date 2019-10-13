@@ -102,11 +102,10 @@ def on_message(client, userdata, message):
         # print(response)
         mqttc.publish('hermes/dialogueManager/endSession', payload=response)
     elif message.topic == 'home/daenerys/backlight':
-        if (message.payload == 'DIM'):
-            print('Sending to bright method')
-            BedsideApp.backlight_bright(top)
-        elif (message.payload == 'BRIGHT'):
+        if (message.payload == b'DIM'):
             BedsideApp.backlight_dim(top)
+        elif (message.payload == b'BRIGHT'):
+            BedsideApp.backlight_bright(top)
         else:
             print(message.payload)
 
@@ -445,8 +444,8 @@ class BedsideApp(App):
         self.temp_update()
         set_lights(current_light, False)
         try:
-            with open('/home/pi/.local/bin/alarmschedule', 'rb') as f:
-                # with open('./alarmschedule', 'rb') as f:
+            #with open('/home/pi/.local/bin/alarmschedule', 'rb') as f:
+            with open(ALARMFILE, 'rb') as f:
                 sched = pickle.load(f)
             for alarm in sched:
                 self.schedule_alarm(alarm)
@@ -584,8 +583,7 @@ class BedsideApp(App):
         """
 
     def temp_update(self):
-        with open('/home/pi/.local/share/tempfile', 'r') as f:
-            # with open('./tempfile', 'r') as f:
+        with open(TEMPFILE, 'r') as f:
             data = f.read()
         temp, hum = data.split('\n')
         temp = temp.replace('Temp:', '').replace('deg F', '')
@@ -620,7 +618,8 @@ class BedsideApp(App):
         print('Light level set to %s', lightLevel)
 
     def backlight_dim(self):
-        Popen(['rpi-backlight', '-b', '11', '-s', '-d', '3'])
+        if PI:
+            Popen(['rpi-backlight', '-b', '11', '-s', '-d', '3'])
 
     def handle_message(self, msg):
         pandora_fields = pickle.loads(msg)
@@ -650,7 +649,7 @@ if __name__ == '__main__':
     # TODO Get configuration file location from command line
     # Import Settings from a configuration file in the same folder as the executable
     config = configparser.ConfigParser()
-    # config.read("./config.txt")
+    #config.read("./config.txt")
     config.read('/home/pi/.config/bedsideapp/config.txt')
     lights = config['Lights']
     RED_PIN = lights.getint('Red', fallback='4')
@@ -672,7 +671,8 @@ if __name__ == '__main__':
     HAToken = home.get('TOKEN', fallback='')
     PATHS = config['LocalPaths']
     fifopath = PATHS.get('fifo')
-    ALARMPATH = PATHS.get('Alarm')
+    ALARMFILE = PATHS.get('Alarm')
+    TEMPFILE = PATHS.get('Temperature')
 
     # Setup connection to Home Assistant
     HAURL = 'http://' + HAServer + ':8123/api/'
