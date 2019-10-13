@@ -378,9 +378,11 @@ class Alarm(Screen):
 class Lights(Screen):
     def __init__(self, **kw):
         Screen.__init__(self, **kw)
+        self.light_state = light_state
 
     def set_color(self):
-        set_lights([self.ids.cp.color[0], self.ids.cp.color[1], self.ids.cp.color[2], self.ids.cp.color[3]], True)
+        set_lights([self.ids.cp.color[0], self.ids.cp.color[1], self.ids.cp.color[2], self.ids.cp.color[3]], self.light_state)
+        light_state = self.light_state
 
 
 class PandoraRadio(Screen):
