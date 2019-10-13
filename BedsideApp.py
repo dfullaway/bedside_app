@@ -102,10 +102,10 @@ def on_message(client, userdata, message):
         # print(response)
         mqttc.publish('hermes/dialogueManager/endSession', payload=response)
     elif message.topic == 'home/daenerys/backlight':
-        if (message.payload == 'DIM' and light_state == True):
-            BedsideApp.backlight_swap(top)
-        elif (message.payload == 'BRIGHT' and light_state == False):
-            BedsideApp.backlight_swap(top)
+        if (message.payload == 'DIM'):
+            BedsideApp.backlight_bright(top)
+        elif (message.payload == 'BRIGHT'):
+            BedsideApp.backlight_dim(top)
 
 
 def on_disconnect(client, userdata, rc):
@@ -606,6 +606,16 @@ class BedsideApp(App):
                 Popen(['rpi-backlight', '-b', '255', '-s', '-d', '3'])
             else:
                 Popen(['rpi-backlight', '-b', '11', '-s', '-d', '3'])
+    
+    def backlight_bright(self, lightLevel='255'):
+        """Brightens the back light for the display.
+        arguments: lightLevel
+        returns nothing
+        """
+        Popen(['rpi-backlight', '-b', lightLevel, '-s', '-d', '3'])
+
+    def backlight_dim(self):
+        Popen(['rpi-backlight', '-b', '11', '-s', '-d', '3'])
 
     def handle_message(self, msg):
         pandora_fields = pickle.loads(msg)
