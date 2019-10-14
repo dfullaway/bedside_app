@@ -1,4 +1,5 @@
 from os import system, environ
+
 environ['KIVY_GL_BACKEND'] = 'gl'
 from kivy.app import App
 from kivy.uix.screenmanager import Screen
@@ -7,7 +8,6 @@ import kivy.clock
 from time import strftime, mktime, time, strptime
 from platform import machine
 import configparser
-# from os import system
 from subprocess import Popen
 import datetime
 import random
@@ -15,15 +15,14 @@ import glob
 import paho.mqtt.client as mqtt
 import signal
 import pickle
-# import requests
 from ha_helpers import getState, set_scene, switch_on, ha_setup
 from kivy.support import install_twisted_reactor
+
 install_twisted_reactor()
 from twisted.internet import reactor
 from twisted.internet import protocol
 import rpi_backlight
 import json
-
 
 __author__ = 'Dan Fullaway'
 
@@ -33,102 +32,62 @@ __author__ = 'Dan Fullaway'
 if machine() == 'armv7l':
     PI = True
     CHANNEL = 'Master'
-    fifopath = '/home/pi/.local/share/applications/pianoctl'
-    # fifopath = '/home/pi/pianoctl'
 else:
     PI = False
     CHANNEL = 'Master'
-    fifopath = '/home/dan/pianoctl'
-
-
-# Import Settings from a configuration file in the same folder as the executable
-config = configparser.ConfigParser()
-#config.read("./config.txt")
-config.read('/home/pi/.config/bedsideapp/config.txt')
-lights = config['Lights']
-RED_PIN = lights.getint('Red', fallback='4')
-GREEN_PIN = lights.getint('Green', fallback='22')
-BLUE_PIN = lights.getint('Blue', fallback='24')
-location = config['Location']
-CURRENT_ZIP = location.get('Zip', fallback='92057')
-sounds = config['Sounds']
-MUSIC_DIR = sounds.get('MusicDir', fallback='/home/dan/Music/')
-MAX_VOLUME = int(sounds.get('MaxVolume', fallback='90'))
-sensor = config['Sensor']
-LOCATION = sensor.get('SensorLocation')
-CERT_PATH = sensor.get('CertPath')
-CLIENT_NAME = sensor.get('ClientName')
-PASSWORD = sensor.get('PW')
-SERVER = sensor.get('ServerAddress')
-home = config['HomeAssistant']
-HAServer = home.get('Server')
-HAToken = home.get('TOKEN', fallback='')
-
-
-HAURL = 'http://' + HAServer +':8123/api/'
-
-TOKEN = 'Bearer ' + HAToken
-
-ha_setup(HAURL, TOKEN)
-
-
-
-# TODO Take appropriate steps if connection to MQTT server is unavailable
-# Setup MQTT Client and connect
-
-topic_string = 'home/' + LOCATION
-current_light = [0, 0, 0, 0]  # Current state of LEDs
-light_state = True
-music = False
-stored_alarm_schedule = []
 
 
 def mqttc_fail(signum, frame):
     print('No mqttc client connection!')
     # raise TimeoutError
 
-try:
-    signal.signal(signal.SIGALRM, mqttc_fail)
-    signal.alarm(5)
-    mqttc = mqtt.Client(client_id=CLIENT_NAME, clean_session=False)
-    mqttc.tls_set(CERT_PATH)
-    mqttc.username_pw_set(CLIENT_NAME, PASSWORD)
-    mqttc.connect(SERVER, port=8883)
 
+def setup_mqtt():
+    try:
+        signal.signal(signal.SIGALRM, mqttc_fail)
+        signal.alarm(5)
+        mqttc = mqtt.Client(client_id=CLIENT_NAME, clean_session=False)
+        mqttc.tls_set(CERT_PATH)
+        mqttc.username_pw_set(CLIENT_NAME, PASSWORD)
+        mqttc.connect(SERVER, port=8883)
 
-    # Subscribe to topics related to settings for light
-    mqttc.subscribe([(topic_string+'/light/switch', 2), (topic_string+'/light/brightness/set', 2),
-                     (topic_string+'/light/rgb/set', 2), ('hermes/intent/dfullaway:SetAlarm', 2),
-                     ('home/daenerys/backlight', 2)])
+        # Subscribe to topics related to settings for light
+        mqttc.subscribe([(TOPIC_STRING + '/light/switch', 2), (TOPIC_STRING + '/light/brightness/set', 2),
+                         (TOPIC_STRING + '/light/rgb/set', 2), ('hermes/intent/dfullaway:SetAlarm', 2),
+                         ('home/daenerys/backlight', 2)])
 
-    mqttc.loop_start()
-    signal.alarm(0)
-except:
-    print('MQTT Connection Failed!')
-    # Logger.warning('MQTT: connection failure')
+        mqttc.loop_start()
+        signal.alarm(0)
+    except:
+        print('MQTT Connection Failed!')
+        # Logger.warning('MQTT: connection failure')
+
+    mqttc.on_message = on_message
+    mqttc.on_disconnect = on_disconnect
+    return mqttc
 
 
 # Callbacks for MQTT
 def on_message(client, userdata, message):
-    '''
+    """
     Handles receipt of message from MQTT Server; currently sets lights as appropriate
     :param client:
     :param userdata:
     :param message: Payload
     :return:
-    '''
+    """
     # print(message.topic, message.payload)
     # Logger.debug('MQTT: Message with topic %s and payload %s', message.topic, message.payload)
-    if message.topic == topic_string+'/light/switch':
+    if message.topic == TOPIC_STRING + '/light/switch':
         if message.payload == b'OFF':
             set_lights(current_light, False)
         elif message.payload == b'ON':
             set_lights(current_light, True)
-    elif message.topic == topic_string+'/light/brightness/set':
-        set_lights([current_light[0], current_light[1], current_light[2], float(message.payload)/255.0], True)
-    elif message.topic == topic_string+'/light/rgb/set':
+    elif message.topic == TOPIC_STRING + '/light/brightness/set':
+        set_lights([current_light[0], current_light[1], current_light[2], float(message.payload) / 255.0], True)
+    elif message.topic == TOPIC_STRING + '/light/rgb/set':
         temp = message.payload.decode('ascii').split(',')
-        set_lights([float(temp[0])/255, float(temp[1])/255, float(temp[2])/255, current_light[3]], True)
+        set_lights([float(temp[0]) / 255, float(temp[1]) / 255, float(temp[2]) / 255, current_light[3]], True)
     elif message.topic == 'hermes/intent/dfullaway:SetAlarm':
         print('Alarm Message Recieved')
         if PI:
@@ -143,11 +102,16 @@ def on_message(client, userdata, message):
         # print(response)
         mqttc.publish('hermes/dialogueManager/endSession', payload=response)
     elif message.topic == 'home/daenerys/backlight':
-        if (message.payload == 'DIM' and light_state == True):
-            BedsideApp.backlight_swap(top)
+        if (message.payload == b'DIM'):
+            BedsideApp.backlight_dim(top)
+        elif (message.payload == b'BRIGHT'):
+            BedsideApp.backlight_bright(top)
+        else:
+            print(message.payload)
 
 
-mqttc.on_message = on_message
+def on_disconnect(client, userdata, rc):
+    setup_mqtt()
 
 
 # Setup Protocol and Factory for Twisted Reactor / Pianobar event script
@@ -166,28 +130,28 @@ class PandoraFactory(protocol.Factory):
 
 
 def set_lights(light_intensity, light_state):
-    '''
+    """
     :param light_intensity: a list of four values between 0 and 1 representing red, green, blue and brightness
     :param light_state: a True/False indicating if the light should be off or on
     :return:
-    '''
+    """
     global current_light
     current_light = light_intensity
     if PI:
-        system('echo "%d=%f" > /dev/pi-blaster' % (RED_PIN, float(current_light[0]*current_light[3])*light_state))
-        system('echo "%d=%f" > /dev/pi-blaster' % (GREEN_PIN, float(current_light[1]*current_light[3])*light_state))
-        system('echo "%d=%f" > /dev/pi-blaster' % (BLUE_PIN, float(current_light[2]*current_light[3])*light_state))
+        system('echo "%d=%f" > /dev/pi-blaster' % (RED_PIN, float(current_light[0] * current_light[3]) * light_state))
+        system('echo "%d=%f" > /dev/pi-blaster' % (GREEN_PIN, float(current_light[1] * current_light[3]) * light_state))
+        system('echo "%d=%f" > /dev/pi-blaster' % (BLUE_PIN, float(current_light[2] * current_light[3]) * light_state))
     else:
         print(light_intensity)
-        print(float(current_light[0]*current_light[3])*light_state)
+        print(float(current_light[0] * current_light[3]) * light_state)
     if light_state is False or current_light[3] == 0:
         status = 'OFF'
     else:
         status = 'ON'
-    mqttc.publish(topic_string+'/light/status', status, 2, retain=True)
-    mqttc.publish(topic_string + '/light/brightness/status', int(light_intensity[3]*255), 2, retain=True)
-    rgb_status = ','.join(str(int(num*255)) for num in light_intensity[:3])
-    mqttc.publish(topic_string+'/light/rgb/status', rgb_status, 2, retain=True)
+    mqttc.publish(TOPIC_STRING + '/light/status', status, 2, retain=True)
+    mqttc.publish(TOPIC_STRING + '/light/brightness/status', int(light_intensity[3] * 255), 2, retain=True)
+    rgb_status = ','.join(str(int(num * 255)) for num in light_intensity[:3])
+    mqttc.publish(TOPIC_STRING + '/light/rgb/status', rgb_status, 2, retain=True)
 
 
 class ClockWidget(Screen):
@@ -202,20 +166,20 @@ class ClockWidget(Screen):
         kivy.clock.Clock.schedule_interval(self.clockupdater, 0.2)
 
     def clockupdater(self, dt):
-        '''
+        """
         Updates the clock
         :param dt: How often to update the clock
         :return: None
-        '''
+        """
         self.ids['time'].text = strftime("%H%M:%S")
         self.ids['date'].text = strftime("%a, %d %B %Y")
         return None
 
     def start_clock(self):
-        '''
+        """
         Restarts clock when returning to main screen
         :return:
-        '''
+        """
         # print('Started')
         kivy.clock.Clock.schedule_interval(self.clockupdater, 0.2)
 
@@ -228,7 +192,7 @@ class ClockWidget(Screen):
         kivy.clock.Clock.unschedule(self.clockupdater)
 
     def set_scene(self, scene):
-            set_scene(scene)
+        set_scene(scene)
 
 
 class ProgramDialog(Screen):
@@ -237,7 +201,7 @@ class ProgramDialog(Screen):
         Screen.__init__(self, **kw)
 
     def set_scene(self, scene):
-            set_scene(scene)
+        set_scene(scene)
 
 
 class WeatherPage(Screen):
@@ -250,11 +214,11 @@ class WeatherPage(Screen):
             self.i = 1
 
     def fill_page(self):
-        '''
+        """
         Run upon entering the weather page. Checks to ensure latest weather was pulled, then displays it. Shows blank
         if the previous weather pull failed.
         :return:
-        '''
+        """
         # global top
         current_temp = getState("sensor.dark_sky_temperature")
         current_humidity = getState("sensor.dark_sky_humidity")
@@ -284,12 +248,12 @@ class AlarmSchedule(Screen):
         Screen.__init__(self, **kw)
 
     def time_handler(self):
-        '''
+        """
         Takes the time displayed on the alarm schedule screen and schedules the alarm for that time. Currently sets for
         the current day if the time shown is later than the current time or the following day if the time shown is
         earlier than the current time.
         :return:
-        '''
+        """
         tomorrow = datetime.date.today() + datetime.timedelta(days=1)
         use_hour = int(self.ids.alarmhour.text)
         if self.ids.alarmAMPM.text == "PM":
@@ -308,12 +272,12 @@ class AlarmSchedule(Screen):
         top.schedule_alarm(dtg)
 
     def test(self):
-        '''
+        """
         Used during testing only. Should not be called during production.
         :return:
-        '''
+        """
         use_hour = int(strftime("%H"))
-        use_time = datetime.time(hour=use_hour, minute=int(strftime("%M"))+1)
+        use_time = datetime.time(hour=use_hour, minute=int(strftime("%M")) + 1)
         dtg = datetime.datetime.combine(datetime.date.today(), use_time)
         top.schedule_alarm(dtg)
 
@@ -325,8 +289,8 @@ class AlarmSchedule(Screen):
         '''
         use_hour = int(strftime("%H"))
         use_time = datetime.datetime.now() + datetime.timedelta(minutes=20)
-        #use_time = datetime.time(hour=use_hour, minute=int(strftime("%M"))+20)
-        #dtg = datetime.datetime.combine(datetime.date.today(), use_time)
+        # use_time = datetime.time(hour=use_hour, minute=int(strftime("%M"))+20)
+        # dtg = datetime.datetime.combine(datetime.date.today(), use_time)
         top.schedule_alarm(use_time)
 
 
@@ -350,15 +314,15 @@ class Alarm(Screen):
         self.counter = 1
 
     def trigger(self):
-        '''
+        """
         Runs upon the alarm triggering. Sets the weather text, starts the music and lights coming up and turns on the
         screen if currently off.
         :return:
-        '''
+        """
 
         current_summary = getState("sensor.dark_sky_hourly_summary")
-        today_high = getState("sensor.dark_sky_daytime_high_temperature_1")
-        today_low = getState("sensor.dark_sky_overnight_low_temperature_1")
+        today_high = getState("sensor.dark_sky_daytime_high_temperature_1d")
+        today_low = getState("sensor.dark_sky_overnight_low_temperature_1d")
 
         string = "Today's Weather: High of {0}, Low of {1} \n {2}".format(today_high, today_low,
                                                                           current_summary)
@@ -372,20 +336,17 @@ class Alarm(Screen):
         switch_on('coffee_machine')
         kivy.clock.Clock.schedule_interval(self.stepup, 1.5)
 
-
-
-
     def stepup(self, dt):
-        '''
+        """
         Increases volume of audio and lights
         :param dt: required for scheduling with Kivy clock function, amount of time between increments
         :return: Boolean
-        '''
+        """
         # Check if volume is less than maximum - increases volume and lights if it is
-        if self.counter < (MAX_VOLUME)+1:
+        if self.counter < (MAX_VOLUME) + 1:
             self.counter += 1
             # Popen(["amixer", 'sset', CHANNEL, str(self.counter) + '%'])
-            set_lights([self.redmax, self.greenmax, self.bluemax, float(self.counter)/100], True)
+            set_lights([self.redmax, self.greenmax, self.bluemax, float(self.counter) / 100], True)
 
         elif self.counter >= MAX_VOLUME and self.snd.poll() is not None:
             top.alarm_schedule_update()
@@ -393,10 +354,10 @@ class Alarm(Screen):
             return False
 
     def cancel_alarm(self):
-        '''
+        """
         Stops the in progress alarm
-        :return: 
-        '''
+        :return:
+        """
         # Stop the loop that changes volume and light level
         kivy.clock.Clock.unschedule(self.stepup)
         # Stops Audio
@@ -419,9 +380,11 @@ class Alarm(Screen):
 class Lights(Screen):
     def __init__(self, **kw):
         Screen.__init__(self, **kw)
+        self.light_state = light_state
 
     def set_color(self):
-        set_lights([self.ids.cp.color[0], self.ids.cp.color[1], self.ids.cp.color[2], self.ids.cp.color[3]], True)
+        set_lights([self.ids.cp.color[0], self.ids.cp.color[1], self.ids.cp.color[2], self.ids.cp.color[3]], self.light_state)
+        light_state = self.light_state
 
 
 class PandoraRadio(Screen):
@@ -468,6 +431,8 @@ class BedsideApp(App):
 
     def __init__(self, **kw):
         App.__init__(self, **kw)
+        self.counter = int(MAX_VOLUME)
+        self.weather_conds = []
 
     alarm_schedule = ListProperty()
 
@@ -479,8 +444,8 @@ class BedsideApp(App):
         self.temp_update()
         set_lights(current_light, False)
         try:
-            with open('/home/pi/.local/bin/alarmschedule', 'rb') as f:
-            #with open('./alarmschedule', 'rb') as f:
+            #with open('/home/pi/.local/bin/alarmschedule', 'rb') as f:
+            with open(ALARMFILE, 'rb') as f:
                 sched = pickle.load(f)
             for alarm in sched:
                 self.schedule_alarm(alarm)
@@ -526,7 +491,7 @@ class BedsideApp(App):
     def program_ender(self):
         kivy.clock.Clock.unschedule(self.stepdown)
         self.pandora_cleanup()
-        self.counter = MAX_VOLUME 
+        self.counter = MAX_VOLUME
         self.root.current = 'Home'
 
     def pandora_cleanup(self):
@@ -611,21 +576,20 @@ class BedsideApp(App):
         self.root.current = 'Alarm'
 
     def pre_alarm(self, *args):
-        '''
+        """
         Starts lights and coffee early.
-        :param args: 
-        :return: 
-        '''
+        :param args:
+        :return:
+        """
 
     def temp_update(self):
-        with open('/home/pi/.local/share/tempfile', 'r') as f:
-        #with open('./tempfile', 'r') as f:
+        with open(TEMPFILE, 'r') as f:
             data = f.read()
         temp, hum = data.split('\n')
-        temp = temp.replace('Temp:','').replace('deg F','')
-        hum = hum.replace('Humidity:','').replace('%', '')
-        topic_temp = 'home/' + LOCATION + '/temp'
-        topic_hum = 'home/' + LOCATION + '/humidity'
+        temp = temp.replace('Temp:', '').replace('deg F', '')
+        hum = hum.replace('Humidity:', '').replace('%', '')
+        topic_temp = TOPIC_STRING + '/temp'
+        topic_hum = TOPIC_STRING + '/humidity'
         mqttc.publish(topic_temp, temp, qos=2)
         mqttc.publish(topic_hum, hum, qos=2)
         data = data.replace('deg', '\u00B0')
@@ -643,6 +607,19 @@ class BedsideApp(App):
                 Popen(['rpi-backlight', '-b', '255', '-s', '-d', '3'])
             else:
                 Popen(['rpi-backlight', '-b', '11', '-s', '-d', '3'])
+    
+    def backlight_bright(self, lightLevel='255'):
+        """Brightens the back light for the display.
+        arguments: lightLevel
+        returns nothing
+        """
+        if PI:
+            Popen(['rpi-backlight', '-b', lightLevel, '-s', '-d', '3'])
+        print('Light level set to %s', lightLevel)
+
+    def backlight_dim(self):
+        if PI:
+            Popen(['rpi-backlight', '-b', '11', '-s', '-d', '3'])
 
     def handle_message(self, msg):
         pandora_fields = pickle.loads(msg)
@@ -667,6 +644,47 @@ class BedsideApp(App):
             self.root.ids.home.ids.musicdisplay.text = " "
             self.root.ids.radio.ids.thumbsup.color = [1, 1, 1, 1]
 
+
 if __name__ == '__main__':
+    # TODO Get configuration file location from command line
+    # Import Settings from a configuration file in the same folder as the executable
+    config = configparser.ConfigParser()
+    #config.read("./config.txt")
+    config.read('/home/pi/.config/bedsideapp/config.txt')
+    lights = config['Lights']
+    RED_PIN = lights.getint('Red', fallback='4')
+    GREEN_PIN = lights.getint('Green', fallback='22')
+    BLUE_PIN = lights.getint('Blue', fallback='24')
+    location = config['Location']
+    CURRENT_ZIP = location.get('Zip', fallback='92057')
+    sounds = config['Sounds']
+    MUSIC_DIR = sounds.get('MusicDir', fallback='/home/dan/Music/')
+    MAX_VOLUME = int(sounds.get('MaxVolume', fallback='90'))
+    sensor = config['Sensor']
+    TOPIC_STRING = sensor.get('MqttPath')
+    CERT_PATH = sensor.get('CertPath')
+    CLIENT_NAME = sensor.get('ClientName')
+    PASSWORD = sensor.get('PW')
+    SERVER = sensor.get('ServerAddress')
+    home = config['HomeAssistant']
+    HAServer = home.get('Server')
+    HAToken = home.get('TOKEN', fallback='')
+    PATHS = config['LocalPaths']
+    fifopath = PATHS.get('fifo')
+    ALARMFILE = PATHS.get('Alarm')
+    TEMPFILE = PATHS.get('Temperature')
+
+    # Setup connection to Home Assistant
+    HAURL = 'http://' + HAServer + ':8123/api/'
+    TOKEN = 'Bearer ' + HAToken
+    ha_setup(HAURL, TOKEN)
+
+    # Setup MQTT Client and connect
+    stored_alarm_schedule = []
+    current_light = [0, 0, 0, 0]  # Current state of LEDs
+    light_state = False
+    music = False
+    mqttc = setup_mqtt()
+
     top = BedsideApp()
     top.run()

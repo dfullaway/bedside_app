@@ -1,4 +1,5 @@
 import requests
+from urllib3.exceptions import MaxRetryError
 
 HAURL = ""
 headers = {}
@@ -16,6 +17,8 @@ def getState(entity):
         response = requests.get(HAURL + 'states/'+ entity, headers=headers)
     except TimeoutError:
         return "Host not available"
+    except MaxRetryError:
+        return "Network Issues"
     return response.json()["state"]
 
 def getStateAttributes(entity):
