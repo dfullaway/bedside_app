@@ -321,8 +321,8 @@ class Alarm(Screen):
         """
 
         current_summary = getState("sensor.dark_sky_hourly_summary")
-        today_high = getState("sensor.dark_sky_daytime_high_temperature_1")
-        today_low = getState("sensor.dark_sky_overnight_low_temperature_1")
+        today_high = getState("sensor.dark_sky_daytime_high_temperature_1d")
+        today_low = getState("sensor.dark_sky_overnight_low_temperature_1d")
 
         string = "Today's Weather: High of {0}, Low of {1} \n {2}".format(today_high, today_low,
                                                                           current_summary)
