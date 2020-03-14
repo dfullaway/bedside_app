@@ -544,7 +544,7 @@ class BedsideApp(App):
             t = kivy.clock.Clock.schedule_once(self.alarm, time_delta)
             top.alarm_schedule.append([alarm_time, t])
             stored_alarm_schedule.append(alarm_time)
-            with open('alarmschedule', 'wb') as f:
+            with open(ALARMFILE, 'wb') as f:
                 pickle.dump(stored_alarm_schedule, f)
 
         self.alarm_schedule_update()
