@@ -244,7 +244,7 @@ class WeatherPage(Screen):
         UrlRequest('https://api.weather.gov/stations/klgb/observations/latest', add_current_weather,
                          req_headers=headers, decode=True)
 
-        weatherJson = getStateAttributes('weather.klgb')['attributes']
+        weatherJson = getStateAttributes('weather.klgb_daynight')['attributes']
         nextWeatherJson = weatherJson['forecast'][1]
         followingWeatherJson = weatherJson['forecast'][2]
         current_summary = weatherJson['forecast'][0]['detailed_description']
@@ -338,7 +338,7 @@ class Alarm(Screen):
         screen if currently off.
         :return:
         """
-        weatherJson = getStateAttributes('weather.klgb')['attributes']
+        weatherJson = getStateAttributes('weather.klgb_daynight')['attributes']
 
         current_summary = weatherJson['forecast'][0]['detailed_description']
 
@@ -537,7 +537,7 @@ class BedsideApp(App):
         :return:None
 
         """
-        weatherJson = getStateAttributes('weather.klgb')
+        weatherJson = getStateAttributes('weather.klgb_daynight')
         weather = requests.get('https://api.weather.gov/stations/klgb/observations/latest',
                                headers={'accept': 'application/geon+json'})
         outside_temp = str(weatherJson['attributes']['temperature'])
@@ -666,8 +666,8 @@ if __name__ == '__main__':
     # TODO Get configuration file location from command line
     # Import Settings from a configuration file in the same folder as the executable
     config = configparser.ConfigParser()
-    #config.read("./config.txt")
-    config.read('/home/pi/.config/bedsideapp/config.txt')
+    config.read("./config.txt")
+    #config.read('/home/pi/.config/bedsideapp/config.txt')
     lights = config['Lights']
     RED_PIN = lights.getint('Red', fallback='4')
     GREEN_PIN = lights.getint('Green', fallback='22')
