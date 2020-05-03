@@ -5,6 +5,7 @@ from kivy.app import App
 from kivy.uix.screenmanager import Screen
 from kivy.properties import ListProperty
 import kivy.clock
+from kivy.network.urlrequest import UrlRequest
 from time import strftime, mktime, time, strptime
 from platform import machine
 import configparser
@@ -15,8 +16,9 @@ import glob
 import paho.mqtt.client as mqtt
 import signal
 import pickle
-from ha_helpers import getState, set_scene, switch_on, ha_setup
+from ha_helpers import getState, set_scene, switch_on, ha_setup, getStateAttributes
 from kivy.support import install_twisted_reactor
+import requests
 
 install_twisted_reactor()
 from twisted.internet import reactor
@@ -129,6 +131,9 @@ class PandoraFactory(protocol.Factory):
         self.app = app
 
 
+def cToF(temp):
+    return (temp * 9.0/5.0)+32
+
 def set_lights(light_intensity, light_state):
     """
     :param light_intensity: a list of four values between 0 and 1 representing red, green, blue and brightness
@@ -220,20 +225,34 @@ class WeatherPage(Screen):
         :return:
         """
         # global top
-        current_temp = getState("sensor.dark_sky_temperature")
-        current_humidity = getState("sensor.dark_sky_humidity")
-        current_wind_direction = getState("sensor.dark_sky_wind_bearing")
-        current_wind_velocity = getState("sensor.dark_sky_wind_speed")
-        current_summary = getState("sensor.dark_sky_hourly_summary")
-        tomorrow_high = getState("sensor.dark_sky_daytime_high_temperature_1")
-        tomorrow_low = getState("sensor.dark_sky_overnight_low_temperature_1")
-        tomorrow_condition = getState("sensor.dark_sky_daily_summary")
+
+        def add_current_weather(req, result):
+            jsonresult = json.loads(result)
+            self.ids.locationlabel.text = 'Weather at {0} as of {1}'.format(jsonresult['properties']['rawMessage'][:4],
+                                                                       jsonresult['properties']['rawMessage'][5:13])
+
+            self.ids.currenttemp.text = str(round(cToF(jsonresult['properties'] ['temperature']['value'])))  + '\u00B0 F'
+            self.ids.currenthumidity.text = str(round(jsonresult['properties']['relativeHumidity']['value']))+ '%'
+            self.ids.currentwind.text = '{0} at {1} knots'.format(jsonresult['properties']['windDirection']['value'],
+                                                                  round(jsonresult['properties']['windSpeed']['value']
+                                                                        *1.944))
+            #self.ids.currentsky.text = str(jsonresult['properties']['rawMessage'][13:])
+
+
+        headers = {'Content-Type': 'application/json', 'User-Agent': '(MyAlarmClock, dfullaway@danielmfullaway.com)'}
+
+        UrlRequest('https://api.weather.gov/stations/klgb/observations/latest', add_current_weather,
+                         req_headers=headers, decode=True)
+
+        weatherJson = getStateAttributes('weather.klgb_daynight')['attributes']
+        nextWeatherJson = weatherJson['forecast'][1]
+        followingWeatherJson = weatherJson['forecast'][2]
+        current_summary = weatherJson['forecast'][0]['detailed_description']
+        tomorrow_high = max(nextWeatherJson['temperature'], followingWeatherJson['temperature'])
+        tomorrow_low = min(nextWeatherJson['temperature'], followingWeatherJson['temperature'])
+        tomorrow_condition = nextWeatherJson['detailed_description']
 
         try:
-            self.ids.currenttemp.text = current_temp + '\u00B0 F'
-            self.ids.currenthumidity.text = current_humidity + '%'
-            self.ids.currentwind.text = '{0} at {1} mph'.format(current_wind_direction,
-                                                                current_wind_velocity)
             self.ids.currentsky.text = current_summary
             self.ids.forecasthigh.text = '{0}\u00B0 F'.format(tomorrow_high)
             self.ids.forecastlow.text = '{0}\u00B0 F'.format(tomorrow_low)
@@ -319,13 +338,11 @@ class Alarm(Screen):
         screen if currently off.
         :return:
         """
+        weatherJson = getStateAttributes('weather.klgb_daynight')['attributes']
 
-        current_summary = getState("sensor.dark_sky_hourly_summary")
-        today_high = getState("sensor.dark_sky_daytime_high_temperature_1d")
-        today_low = getState("sensor.dark_sky_overnight_low_temperature_1d")
+        current_summary = weatherJson['forecast'][0]['detailed_description']
 
-        string = "Today's Weather: High of {0}, Low of {1} \n {2}".format(today_high, today_low,
-                                                                          current_summary)
+        string = "Today's Weather: {0}".format(current_summary)
 
         self.ids.wakeupweather.text = string
         self.song = self.choose_song()
@@ -520,17 +537,17 @@ class BedsideApp(App):
         :return:None
 
         """
-        if PI:
-            outside_temp = getState('sensor.dark_sky_temperature')
-            weather_condition = getState('sensor.dark_sky_summary')
-            self.root.ids.home.ids.weather.color = [1, 1, 1, 1]
-            try:
-                self.root.ids.home.ids.weather.text = (weather_condition + '\n' + outside_temp + '\u00B0 F')
-            except AttributeError:
-                self.root.ids.home.ids.weather.color = [1, 0, 0, 1]
-                self.root.ids.home.ids.weather.text = "Unknown"
-        else:
-            self.root.ids.home.ids.weather.text = "Not on a Pi"
+        weatherJson = getStateAttributes('weather.klgb_daynight')
+        weather = requests.get('https://api.weather.gov/stations/klgb/observations/latest',
+                               headers={'accept': 'application/geon+json'})
+        outside_temp = str(weatherJson['attributes']['temperature'])
+        weather_condition = weather.json()['properties']['textDescription']
+        self.root.ids.home.ids.weather.color = [1, 1, 1, 1]
+        try:
+            self.root.ids.home.ids.weather.text = (weather_condition + '\n' + outside_temp + '\u00B0 F')
+        except AttributeError:
+            self.root.ids.home.ids.weather.color = [1, 0, 0, 1]
+            self.root.ids.home.ids.weather.text = "Unknown"
 
     def schedule_alarm(self, alarm_time):
         """
@@ -649,8 +666,8 @@ if __name__ == '__main__':
     # TODO Get configuration file location from command line
     # Import Settings from a configuration file in the same folder as the executable
     config = configparser.ConfigParser()
-    #config.read("./config.txt")
-    config.read('/home/pi/.config/bedsideapp/config.txt')
+    config.read("./config.txt")
+    #config.read('/home/pi/.config/bedsideapp/config.txt')
     lights = config['Lights']
     RED_PIN = lights.getint('Red', fallback='4')
     GREEN_PIN = lights.getint('Green', fallback='22')

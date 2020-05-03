@@ -226,33 +226,40 @@ ScreenManager:
 
         GridLayout:
             cols: 2
+            cols_minimum: {1: 600}
 
             Label:
                 text: 'Temperature'
+                background_color: 0,0,0,0
                 #size_hint_x: None
-                #width: 50
+                #width: 100
 
             Label:
                 id: currenttemp
                 text: ''
+                background_color: 0,0,0,0
 
             Label:
                 text: 'Humidity'
+                background_color: 0,0,0,0
                 #size_hint_x: None
                 #width: 50
 
             Label:
                 id: currenthumidity
                 text: ''
+                background_color: 0,0,0,0
 
             Label:
                 text: 'Wind'
                 #size_hint_x: None
                 #width: 50
+                background_color: 0,0,0,0
 
             Label:
                 id: currentwind
                 text: ''
+                background_color: 0,0,0,0
 
             Label:
                 text: 'Sky Condition'
@@ -260,8 +267,10 @@ ScreenManager:
                 #width: 50
 
             Label:
+                text_size: self.width, None
                 id: currentsky
                 text: ''
+                halign: 'center'
 
         Label:
             id: forecastlabel
@@ -269,6 +278,7 @@ ScreenManager:
 
         GridLayout:
             cols:2
+            cols_minimum: {1: 600}
 
             Label:
                 text: 'High'
@@ -291,6 +301,7 @@ ScreenManager:
                 text_size: self.size
                 id: forecastsky
                 text: ''
+                halign: 'center'
         Button:
             text: 'Return'
             background_color: [0, 0, 0, 1]
