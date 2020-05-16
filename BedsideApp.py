@@ -540,8 +540,14 @@ class BedsideApp(App):
         weatherJson = getStateAttributes('weather.klgb_daynight')
         weather = requests.get('https://api.weather.gov/stations/klgb/observations/latest',
                                headers={'accept': 'application/geon+json'})
-        outside_temp = str(weatherJson['attributes']['temperature'])
-        weather_condition = weather.json()['properties']['textDescription']
+        try:
+           outside_temp = str(weatherJson['attributes']['temperature'])
+        except KeyError:
+            outside_temp = "Unknown"
+        try:
+           weather_condition = weather.json()['properties']['textDescription']
+        except KeyError:
+            weather_condtion = "Unknown"
         self.root.ids.home.ids.weather.color = [1, 1, 1, 1]
         try:
             self.root.ids.home.ids.weather.text = (weather_condition + '\n' + outside_temp + '\u00B0 F')
@@ -561,7 +567,7 @@ class BedsideApp(App):
             t = kivy.clock.Clock.schedule_once(self.alarm, time_delta)
             top.alarm_schedule.append([alarm_time, t])
             stored_alarm_schedule.append(alarm_time)
-            with open(ALARMFILE, 'wb') as f:
+            with open(ALARMFILE,'wb') as f:
                 pickle.dump(stored_alarm_schedule, f)
 
         self.alarm_schedule_update()
@@ -666,8 +672,8 @@ if __name__ == '__main__':
     # TODO Get configuration file location from command line
     # Import Settings from a configuration file in the same folder as the executable
     config = configparser.ConfigParser()
-    config.read("./config.txt")
-    #config.read('/home/pi/.config/bedsideapp/config.txt')
+    #config.read("./config.txt")
+    config.read('/home/pi/.config/bedsideapp/config.txt')
     lights = config['Lights']
     RED_PIN = lights.getint('Red', fallback='4')
     GREEN_PIN = lights.getint('Green', fallback='22')

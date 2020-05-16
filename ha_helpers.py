@@ -22,7 +22,12 @@ def getState(entity):
     return response.json()["state"]
 
 def getStateAttributes(entity):
-    response = requests.get(HAURL + 'states/' + entity, headers=headers)
+    try:
+       response = requests.get(HAURL + 'states/' + entity, headers=headers)
+    except MaxRetryError:
+        return "Network Issues"
+    except ConnectionError:
+        return "Network Issues"
     return response.json()
 
 def set_scene(scene):
