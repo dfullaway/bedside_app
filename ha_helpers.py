@@ -43,3 +43,9 @@ def switch_on(switch):
     post_url = HAURL + 'services/switch/turn_on'
     data = '{"entity_id":' + string_switch +'}'
     requests.post(post_url, headers=headers, data=data)
+
+def switch_toggle(switch):
+    string_switch = '"switch.' + str(switch) + '"'
+    post_url = HAURL + 'services/switch/toggle'
+    data = '{"entity_id":' + string_switch +'}'
+    requests.post(post_url, headers=headers, data=data)

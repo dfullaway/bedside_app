@@ -16,7 +16,7 @@ import glob
 import paho.mqtt.client as mqtt
 import signal
 import pickle
-from ha_helpers import getState, set_scene, switch_on, ha_setup, getStateAttributes
+from ha_helpers import getState, set_scene, switch_on, ha_setup, getStateAttributes, switch_toggle
 from kivy.support import install_twisted_reactor
 import requests
 
@@ -645,6 +645,9 @@ class BedsideApp(App):
     def backlight_dim(self):
         if PI:
             Popen(['rpi-backlight', '-b', '11', '-s', '-d', '3'])
+
+    def bedlight_swap(self):
+        switch_toggle('bedlamp')
 
     def handle_message(self, msg):
         pandora_fields = pickle.loads(msg)
