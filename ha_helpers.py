@@ -28,6 +28,8 @@ def getStateAttributes(entity):
         return "Network Issues"
     except ConnectionError:
         return "Network Issues"
+    except requests.ConnectionError:
+        return "Connection Error"
     return response.json()
 
 def set_scene(scene):

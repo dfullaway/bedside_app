@@ -544,6 +544,8 @@ class BedsideApp(App):
            outside_temp = str(weatherJson['attributes']['temperature'])
         except KeyError:
             outside_temp = "Unknown"
+        except TypeError:
+            outside_temp ="Unknown"
         try:
            weather_condition = weather.json()['properties']['textDescription']
         except KeyError:
