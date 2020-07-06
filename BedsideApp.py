@@ -338,9 +338,11 @@ class Alarm(Screen):
         screen if currently off.
         :return:
         """
-        weatherJson = getStateAttributes('weather.klgb_daynight')['attributes']
-
-        current_summary = weatherJson['forecast'][0]['detailed_description']
+        try:
+            weatherJson = getStateAttributes('weather.klgb_daynight')['attributes']
+            current_summary = weatherJson['forecast'][0]['detailed_description']
+        except KeyError:
+            current_summary = "Weather Offline"
 
         string = "Today's Weather: {0}".format(current_summary)
 
@@ -549,7 +551,7 @@ class BedsideApp(App):
         try:
            weather_condition = weather.json()['properties']['textDescription']
         except KeyError:
-            weather_condtion = "Unknown"
+            weather_condition = "Unknown"
         self.root.ids.home.ids.weather.color = [1, 1, 1, 1]
         try:
             self.root.ids.home.ids.weather.text = (weather_condition + '\n' + outside_temp + '\u00B0 F')
