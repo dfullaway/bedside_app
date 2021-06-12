@@ -691,7 +691,7 @@ if __name__ == '__main__':
     GREEN_PIN = lights.getint('Green', fallback='22')
     BLUE_PIN = lights.getint('Blue', fallback='24')
     location = config['Location']
-    CURRENT_ZIP = location.get('Zip', fallback='92057')
+    CURRENT_ZIP = location.get('Zip', fallback='90210')
     sounds = config['Sounds']
     MUSIC_DIR = sounds.get('MusicDir', fallback='/home/dan/Music/')
     MAX_VOLUME = int(sounds.get('MaxVolume', fallback='90'))
