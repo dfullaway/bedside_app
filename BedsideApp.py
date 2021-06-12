@@ -19,6 +19,7 @@ import pickle
 from ha_helpers import getState, set_scene, switch_on, ha_setup, getStateAttributes, switch_toggle
 from kivy.support import install_twisted_reactor
 import requests
+from json.decoder import JSONDecodeError
 
 install_twisted_reactor()
 from twisted.internet import reactor
@@ -343,6 +344,8 @@ class Alarm(Screen):
             current_summary = weatherJson['forecast'][0]['detailed_description']
         except KeyError:
             current_summary = "Weather Offline"
+        except TypeError:
+            current_summary = "Weather Offline"
 
         string = "Today's Weather: {0}".format(current_summary)
 
@@ -552,6 +555,8 @@ class BedsideApp(App):
            weather_condition = weather.json()['properties']['textDescription']
         except KeyError:
             weather_condition = "Unknown"
+        except JSONDecodeError:
+            weather_condition = "Unknown"
         self.root.ids.home.ids.weather.color = [1, 1, 1, 1]
         try:
             self.root.ids.home.ids.weather.text = (weather_condition + '\n' + outside_temp + '\u00B0 F')
@@ -705,7 +710,7 @@ if __name__ == '__main__':
     TEMPFILE = PATHS.get('Temperature')
 
     # Setup connection to Home Assistant
-    HAURL = 'http://' + HAServer + ':8123/api/'
+    HAURL = 'https://' + HAServer + '/api/'
     TOKEN = 'Bearer ' + HAToken
     ha_setup(HAURL, TOKEN)
 
